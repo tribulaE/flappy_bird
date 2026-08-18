@@ -38,7 +38,7 @@ class Agent:
     def __init__(self, hyperparameters_set):
 
         # Load hyperparameters from the YAML file
-        with open('flappy_bird/hp.yml', 'r') as file:
+        with open('hp.yml', 'r') as file:
             self_hyperparameters = yaml.safe_load(file)
             hyperparameters = self_hyperparameters[hyperparameters_set]
 
@@ -68,19 +68,17 @@ class Agent:
         self.GRAPH_FILE = os.path.join(RUNS_DIR, f"{self.hyperparameters_set}.png")
 
     def run(self, is_training=True, render=False):
+        start_time = datetime.now()
+        last_graph_update_time = start_time
 
         if is_training:
-            start_time = datetime.now()
-            last_graph_update_time = start_time
-
             log_message = f"{start_time.strftime(DATE_FORMAT)}: Training starting"
             print(log_message)
             with open(self.LOG_FILE, 'w') as file:
                 file.write(log_message + '\n')
 
         # Create the Flappy Bird environment
-        #env = gymnasium.make("FlappyBird-v0", render_mode="human" if render else None, use_lidar=False)
-        env = gymnasium.make("CartPole-v1", render_mode="human" if render else None)
+        env = gymnasium.make("FlappyBird-v0", render_mode="human" if render else None, use_lidar=False)
 
         num_states = env.observation_space.shape[0]
         num_actions = env.action_space.n
@@ -142,7 +140,7 @@ class Agent:
                     action = torch.tensor(action, dtype=torch.int64, device=device)
                 else:
                     with torch.no_grad():
-                        #converting state to a two dimensional matrix
+                    #converting state to a two dimensional matrix
                         action = policy_dqn(state.unsqueeze(dim=0)).squeeze().argmax()
 
                 # Processing:
@@ -157,7 +155,6 @@ class Agent:
 
                 if is_training:
                     memory.append((state, action, reward, new_state, terminated))
-
                     step_count += 1
                 
                 #Move to a new state
@@ -165,6 +162,7 @@ class Agent:
 
             #Keeping track of the rewards collected per episode
             reward_per_episode.append(episode_reward)
+
 
             #Save ,pdel when new best reward is obtained
             if is_training:
@@ -177,25 +175,27 @@ class Agent:
                     torch.save(policy_dqn.state_dict(), self.MODEL_FILE)
                     best_reward = episode_reward
 
-            epsilon = max(self.epsilon_min, epsilon * self.epsilon_decay)
-            epsilon_history.append(epsilon)
+                current_time = datetime.now()
+                if current_time - last_graph_update_time > timedelta(seconds=10):
+                    self.save_graph(reward_per_episode, epsilon_history)
+                    last_graph_update_time = current_time
 
-            if datetime.now() - last_graph_update_time > timedelta(seconds=10):
-                self.save_graph(reward_per_episode, epsilon_history)
-                last_graph_update_time = start_time
+                 #If enough experience has been collected
+                if len(memory) > self.mini_batch_size:
 
-            #If enough experience has been collected
-            if len(memory) > self.mini_batch_size:
+                    #Sample from memory 
+                    mini_batch = memory.sample(self.mini_batch_size)
 
-                #Sample from memory 
-                mini_batch = memory.sample(self.mini_batch_size)
+                    self.optimze(mini_batch, policy_dqn, target_dqn)
 
-                self.optimze(mini_batch, policy_dqn, target_dqn)
+                    epsilon = max(epsilon * self.epsilon_decay, self.epsilon_min)
+                    epsilon_history.append(epsilon)
 
-                #Copying policy network to target newtork after a certain number of steps
-                if step_count > self.network_sync_rate:
-                    target_dqn.load_state_dict(policy_dqn.state_dict())
-                    step_count = 0
+
+                    #Copying policy network to target newtork after a certain number of steps
+                    if step_count > self.network_sync_rate:
+                        target_dqn.load_state_dict(policy_dqn.state_dict())
+                        step_count = 0
 
 
     def save_graph(self, reward_per_episode, epsilon_history):

@@ -12,4 +12,6 @@ flappybird1:
   fc1_nodes: 512
   env_make_params:
     use_lidar: False
+  enable_double_dqn: True
+  enable_dueling_dqn: True
 

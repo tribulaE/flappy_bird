@@ -55,7 +55,8 @@ class Agent:
         self.discount_factor_g = hyperparameters['discount_factor_g']
         self.stop_on_reward = hyperparameters['stop_on_reward']
         self.fc1_nodes = hyperparameters['fc1_nodes'] #Stop training after reaching this number of rewards
-
+        self.enable_double_dqn = hyperparameters['enable_double_dqn']
+        self.enable_dueling_dqn = hyperparameters['enable_dueling_dqn']
         self.env_make_params = hyperparameters.get('env_make_params', {})
 
         #Loss fucntion and Optimizer for nn
@@ -245,10 +246,17 @@ class Agent:
             terminations = torch.tensor(terminations).float().to(device)
 
             with torch.no_grad():
-                
-                #Calculate target Q values 
-                target_q = rewards + (1-terminations) * self.discount_factor_g * target_dqn(next_states).max(dim=1).values
+                if self.enable_double_dqn:
+                     best_actions_from_policy = policy_dqn(next_states).argmax(dim=1)
 
+                    #Calculate target Q values
+                     target_q = rewards + (1-terminations) * self.discount_factor_g * \
+                                target_dqn(next_states).gather(dim=1, index=best_actions_from_policy.unsqueeze(dim=1)).squeeze()
+                                    
+                else:
+                    #Caculate target Q values (expected returns)
+                    target_q = rewards + (1- terminations) * self.discount_factor_g * target_dqn(next_states).mac(dim=1)[0]                 
+                                        
             #Calculate q values from current policy
             current_q = policy_dqn(states).gather(dim=1, index=actions.unsqueeze(dim=1)).squeeze()
 

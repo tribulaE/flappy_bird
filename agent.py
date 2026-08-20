@@ -88,7 +88,7 @@ class Agent:
     
 
         #Create policy and target network (nodes in the hidden layer can be adjusted in the hyperparameters file)
-        policy_dqn = DQN(num_states, num_actions, self.fc1_nodes).to(device)
+        policy_dqn = DQN(num_states, num_actions, self.fc1_nodes, self.enable_double_dqn).to(device)
 
         if is_training:
 
@@ -100,7 +100,7 @@ class Agent:
 
             epsilon = self.epsilon_init
 
-            target_dqn = DQN(num_states, num_actions, self.fc1_nodes).to(device)
+            target_dqn = DQN(num_states, num_actions, self.fc1_nodes, self.enable_double_dqn).to(device)
             target_dqn.load_state_dict(policy_dqn.state_dict())
 
             #Keep track of epsilon decay
@@ -255,7 +255,7 @@ class Agent:
                                     
                 else:
                     #Caculate target Q values (expected returns)
-                    target_q = rewards + (1- terminations) * self.discount_factor_g * target_dqn(next_states).mac(dim=1)[0]                 
+                    target_q = rewards + (1- terminations) * self.discount_factor_g * target_dqn(next_states).max(dim=1)[0]                 
                                         
             #Calculate q values from current policy
             current_q = policy_dqn(states).gather(dim=1, index=actions.unsqueeze(dim=1)).squeeze()

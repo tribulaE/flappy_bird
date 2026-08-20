@@ -33,6 +33,7 @@ class DQN(nn.Module):
         x = F.relu(self.fc1(x))
 
         if self.enable_dueling_dqn:
+            
             #Value calc
             v = F.relu(self.fc_value(x))
             V = self.value(v)
